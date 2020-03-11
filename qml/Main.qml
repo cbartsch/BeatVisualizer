@@ -1,11 +1,40 @@
 import Felgo 3.0
 import QtQuick 2.0
+import Qt.labs.settings 1.1
 
 import at.cb.beatlib 1.0
 
 App {
   property string audioFileName: ""
   readonly property bool hasAudioFile: !!audioFileName
+
+  Settings {
+    id: settings
+
+    property var recentFiles: []
+  }
+
+  AudioFileSelector {
+    id: audioFileSelector
+
+    onAudioFileSelected: {
+      audioFileName = fileName
+
+      settings.recentFiles = [fileName].concat(settings.recentFiles.slice(0, 4))
+
+      console.log("rf is now", settings.recentFiles)
+    }
+  }
+
+  MP3Decoder {
+    id: mp3Decoder
+
+    effect: MultiEffect {
+      effects: [beatDetector, volumeDetector]
+    }
+
+    onMetaDataChanged: console.log("meta data changed", metaData)
+  }
 
   DirectForm2Filter {
     id: envelopeDetector
@@ -74,22 +103,6 @@ App {
     }
   }
 
-  AudioFileSelector {
-    id: audioFileSelector
-
-    onAudioFileSelected: audioFileName = fileName
-  }
-
-  MP3Decoder {
-    id: mp3Decoder
-
-    effect: MultiEffect {
-      effects: [beatDetector, volumeDetector]
-    }
-
-    onMetaDataChanged: console.log("meta data changed", metaData)
-  }
-
   NavigationStack {
 
     Page {
@@ -103,7 +116,7 @@ App {
 
         anchors.bottom: parent.bottom
         width: parent.width
-        height: dp(80)
+        height: visible ? dp(80) : 0
         color: Qt.rgba(c, c, c, 1)
         visible: mp3Decoder.running
 
@@ -175,10 +188,30 @@ App {
             onSelected: audioFileSelector.selectAudioFile()
           }
 
+          Repeater {
+            model: settings.recentFiles
+
+            SimpleRow {
+              text: decodeURIComponent(fileUtils.cropPathAndKeepFilename(modelData))
+              visible: !hasAudioFile
+              textItem.maximumLineCount: 5
+              textItem.wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+
+              onSelected: audioFileName = modelData
+            }
+          }
+
+          SimpleRow {
+            text: "Clear recents"
+            visible: !hasAudioFile && settings.recentFiles.length > 0
+
+            onSelected: settings.recentFiles = []
+          }
+
           SimpleRow {
             text: "Close file"
             visible: hasAudioFile
-            enabled: !mp3Decoder.running
+            enabled: mp3Decoder.idle
             textItem.color: enabled ? "black" : "grey"
 
             onSelected: audioFileName = ""
@@ -195,7 +228,7 @@ App {
 
           SimpleRow {
             text: "Play file"
-            visible: hasAudioFile && !mp3Decoder.running
+            visible: hasAudioFile && mp3Decoder.idle
 
             onSelected: {
               var stream = audioFileSelector.openAudioStream(audioFileName)
@@ -226,6 +259,19 @@ App {
             visible: mp3Decoder.running
 
             onSelected: mp3Decoder.stop()
+          }
+
+          SimpleRow {
+            text: "Stopping..."
+            visible: mp3Decoder.stopping
+            enabled: false
+            textItem.color: "grey"
+          }
+
+          SimpleRow {
+            text: "State: " + mp3Decoder.state
+            enabled: false
+            textItem.color: "grey"
           }
         }
       }
