@@ -21,8 +21,6 @@ App {
       audioFileName = fileName
 
       settings.recentFiles = [fileName].concat(settings.recentFiles.slice(0, 4))
-
-      console.log("rf is now", settings.recentFiles)
     }
   }
 
@@ -32,8 +30,6 @@ App {
     effect: MultiEffect {
       effects: [beatDetector, volumeDetector]
     }
-
-    onMetaDataChanged: console.log("meta data changed", metaData)
   }
 
   DirectForm2Filter {
@@ -192,7 +188,7 @@ App {
             model: settings.recentFiles
 
             SimpleRow {
-              text: decodeURIComponent(fileUtils.cropPathAndKeepFilename(modelData))
+              text: readableFileName(modelData)
               visible: !hasAudioFile
               textItem.maximumLineCount: 5
               textItem.wrapMode: Text.WrapAtWordBoundaryOrAnywhere
@@ -220,7 +216,7 @@ App {
           SimpleRow {
             id: fileNameRow
             text: audioFileName ? "File:" : "No file selected"
-            detailText: audioFileName
+            detailText: readableFileName(audioFileName)
             enabled: false
             visible: hasAudioFile
             textItem.color: enabled ? "black" : "grey"
@@ -267,14 +263,12 @@ App {
             enabled: false
             textItem.color: "grey"
           }
-
-          SimpleRow {
-            text: "State: " + mp3Decoder.state
-            enabled: false
-            textItem.color: "grey"
-          }
         }
       }
     }
+  }
+
+  function readableFileName(fileName) {
+    return decodeURIComponent(fileUtils.cropPathAndKeepFilename(fileName))
   }
 }
