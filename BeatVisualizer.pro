@@ -23,7 +23,15 @@ DEPLOYMENTFOLDERS += qmlFolder # comment for publishing
 assetsFolder.source = assets
 DEPLOYMENTFOLDERS += assetsFolder
 
-include($$PWD/../beats/BeatLib/src/beatlib_sources.pri)
+# use this to include BeatLib from sources
+# comment to load from Qt installation as QML plugin
+#CONFIG += BEAT_LIB_SRC
+
+BEAT_LIB_SRC {
+  message(Include BeatLib sources.)
+  include($$PWD/../beats/BeatLib/src/beatlib_sources.pri)
+  DEFINES += BEAT_LIB_SRC
+}
 
 # Add more folders to ship with the application here
 

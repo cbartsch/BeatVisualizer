@@ -8,7 +8,9 @@
 
 #include <QDebug>
 
-#include "beatlib_plugin.h"
+#ifdef BEAT_LIB_SRC
+  #include "beatlib_plugin.h"
+#endif
 
 int main(int argc, char *argv[])
 {
@@ -21,10 +23,11 @@ int main(int argc, char *argv[])
   QQmlApplicationEngine engine;
   felgo.initialize(&engine);
 
+#ifdef BEAT_LIB_SRC
   BeatLibPlugin p;
   p.initializeEngine(&engine, "at.cb.beatlib");
   p.registerTypes("at.cb.beatlib");
-
+#endif
 
   // Set an optional license key from project file
   // This does not work if using Felgo Live, only for Felgo Cloud Builds and local builds
