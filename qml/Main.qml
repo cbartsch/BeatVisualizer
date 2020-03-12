@@ -3,10 +3,15 @@ import QtQuick 2.0
 import Qt.labs.settings 1.1
 
 import at.cb.beatlib 1.0
+import "effects"
 
 App {
   property string audioFileName: ""
   readonly property bool hasAudioFile: !!audioFileName
+
+  property int currentFilterIndex: 0
+  readonly property var beatFilters: [null, bassBeatfilter, melodyBeatFilter]
+  readonly property var beatFilterNames: ["None", "Bass", "Melody"]
 
   Settings {
     id: settings
@@ -55,49 +60,41 @@ App {
     startTime: mp3Decoder.startTime
   }
 
+  MelodyBeatFilter {
+    id: melodyBeatFilter
+    // highpass filter for melody beat detection
+  }
+
+  BassBeatFilter {
+    id: bassBeatfilter
+    // lowpass filter for bass/rhythm beat detection
+  }
+
   BeatDetector {
     id: beatDetector
 
-    envelopeDetector: DirectForm2Filter {
-      id: envelopeDetector
-
-      data: ({
-               order: 8,
-               sosMatrix: [
-                 [1, 2, 1, 1, -1.999582010463876, 0.999583152065339],
-                 [1, 2, 1, 1, -1.998812233343328, 0.998813374505309],
-                 [1, 2, 1, 1, -1.998223471725322, 0.998224612551167],
-                 [1, 2, 1, 1, -1.997904980861054, 0.997906121505067]
-               ],
-               scaleValues: [
-                 0.000000285400366,
-                 0.000000285290495,
-                 0.000000285206461,
-                 0.000000285161003
-               ]
-             })
-    }
+    preEffect: beatFilters[currentFilterIndex]
+    envelopeDetector: EnvelopeFilter { }
 
     volumeDetector: volumeDetector
 
-    minTimeDistanceMs: 100
+    minTimeDistanceMs: 200
     beatHalfLifeTimeMs: 500
 
     onBeatDetected: {
       var beatTimeMs = sampleIndex / mp3Decoder.sampleRate * 1000
       var playTimeMs = new Date().getTime() - mp3Decoder.startTime
       var timeDiffMs = beatTimeMs - playTimeMs
-      var startTimeMs = timeDiffMs - 500
 
       console.log("beat", envValue, diffValue, volume, timeDiffMs)
 
-      if(startTimeMs > 0) {
+      if(timeDiffMs > 0) {
         animLineC.createObject(animRow, {
-                                 startTimeMs: timeDiffMs,
-                                 intensity: diffValue / 2,
-                                 loudness: envValue / maxValue,
-                                 volume: volume
-                               })
+                                            timeDiffMs: timeDiffMs,
+                                            intensity: diffValue / 2,
+                                            loudness: envValue / maxValue,
+                                            volume: volume
+                                          })
       }
     }
   }
@@ -115,7 +112,7 @@ App {
 
         anchors.bottom: parent.bottom
         width: parent.width
-        height: visible ? dp(80) : 0
+        height: visible ? dp(100) : 0
         color: Qt.rgba(c, c, c, 1)
         visible: mp3Decoder.running
 
@@ -139,10 +136,12 @@ App {
           Rectangle {
             id: animLine
 
-            property real startTimeMs: 0
+            property real timeDiffMs: 0
             property real intensity: 0
             property real loudness: 0
             property real volume: 0
+
+            readonly property real animDurationMs: 1000
 
             color: Qt.rgba(volume * 2, 0, 0, 1)
             width: dp(50) * loudness
@@ -150,20 +149,19 @@ App {
             x: -width
             anchors.bottom: parent.bottom
 
-            Timer {
-              interval: animLine.startTimeMs
-              running: true
-              repeat: false
-              onTriggered: xAnim.start()
-            }
-
             PropertyAnimation on x {
               id: xAnim
-              running: false
+              running: true
+              from: -(animRow.width / 2) * (animLine.timeDiffMs / (animLine.animDurationMs / 2) + 0.5)
               to: animRow.width
-              duration: 1000
+              duration: animLine.animDurationMs / 2 + animLine.timeDiffMs
 
               onRunningChanged: if(!running) animLine.destroy()
+            }
+
+            Connections {
+              target: mp3Decoder
+              onRunningChanged: if(!mp3Decoder.running) animLine.destroy()
             }
           }
         }
@@ -222,7 +220,13 @@ App {
             detailText: readableFileName(audioFileName)
             enabled: false
             visible: hasAudioFile
-            textItem.color: enabled ? "black" : "grey"
+          }
+
+          SimpleRow {
+            text: "Beat detection filter: " + beatFilterNames[currentFilterIndex]
+            visible: hasAudioFile && mp3Decoder.idle
+
+            onSelected: currentFilterIndex = (currentFilterIndex + 1) % beatFilters.length
           }
 
           SimpleRow {
